@@ -1,4 +1,3 @@
-
 import streamlit as st
 import geopandas as gpd
 import plotly.express as px
@@ -60,7 +59,6 @@ def plot_map(gdf, layer_name):
     if gdf is not None and "PROG" in gdf.columns and "name_en" in gdf.columns:
         gdf["status_label"] = gdf["PROG"].fillna("").astype(str).str.strip().str.upper()
 
-        # تطبيع وتعديل أسماء الحالات
         gdf["status_label"] = gdf["status_label"].replace({
             "": "NO STATUS",
             "DONE": "DONE",
@@ -78,14 +76,13 @@ def plot_map(gdf, layer_name):
             color="status_label",
             hover_name="hover_text",
             center={"lat": 26.43, "lon": 50.10},
-            mapbox_style="carto-positron",
+            mapbox_style="satellite-streets",  # صور جوية
             zoom=10,
             color_discrete_map=status_colors
         )
         fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, height=700)  # تكبير
 
-        # مفتاح الألوان
         st.markdown('<div class="legend-box"><b>🗺️ مفتاح الألوان:</b>', unsafe_allow_html=True)
         for status, color in status_colors.items():
             st.markdown(f'<span style="color:{color}">⬤</span> {status}', unsafe_allow_html=True)
