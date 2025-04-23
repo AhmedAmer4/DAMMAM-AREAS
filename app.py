@@ -1,14 +1,100 @@
 
 import streamlit as st
-import pandas as pd
+import geopandas as gpd
 import plotly.express as px
-import json
-import os
+import pandas as pd
 
-st.set_page_config(layout="wide")
-st.markdown("<h1 style='text-align: center; color: #3498db;'>GIZA ARABIA</h1>", unsafe_allow_html=True)
+st.set_page_config(page_title="Dammam Dashboard", layout="wide")
 
-layer_files = {
+# CSS لتنسيق العنوان والخلفية
+st.markdown(
+    """
+    <style>
+    .main {
+        background-color: #0d1b2a;
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+    }
+    .title {
+        font-size: 36px;
+        font-weight: bold;
+        color: #2196f3;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    .legend-box {
+        background-color: #1e293b;
+        padding: 10px;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown('<div class="title">GIZA ARABIA</div>', unsafe_allow_html=True)
+st.markdown('<div class="main">', unsafe_allow_html=True)
+
+# تعريف الألوان الموحدة لكل الحالات
+status_colors = {
+    "DONE": "limegreen",
+    "IN PROGRESS": "yellow",
+    "PLANNED": "pink",
+    "PENDING": "dodgerblue",
+    "NO STATUS": "lightblue"
+}
+
+# تحميل البيانات
+def load_data(file_path):
+    try:
+        gdf = gpd.read_file(file_path)
+        return gdf
+    except Exception as e:
+        st.error(f"Error loading file: {e}")
+        return None
+
+# رسم الخريطة
+def plot_map(gdf, layer_name):
+    if gdf is not None and "PROG" in gdf.columns and "name_en" in gdf.columns:
+        gdf["status_label"] = gdf["PROG"].fillna("").astype(str).str.strip().str.upper()
+
+        # تطبيع وتعديل أسماء الحالات
+        gdf["status_label"] = gdf["status_label"].replace({
+            "": "NO STATUS",
+            "DONE": "DONE",
+            "IN PROGRESS": "IN PROGRESS",
+            "PLANNED": "PLANNED",
+            "PENDING": "PENDING"
+        })
+        gdf["status_label"] = gdf["status_label"].where(gdf["status_label"].isin(status_colors.keys()), "NO STATUS")
+        gdf["hover_text"] = "Area: " + gdf["name_en"] + "<br>Status: " + gdf["status_label"]
+
+        fig = px.choropleth_mapbox(
+            gdf,
+            geojson=gdf.geometry,
+            locations=gdf.index,
+            color="status_label",
+            hover_name="hover_text",
+            center={"lat": 26.43, "lon": 50.10},
+            mapbox_style="carto-positron",
+            zoom=10,
+            color_discrete_map=status_colors
+        )
+        fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+        st.plotly_chart(fig, use_container_width=True)
+
+        # مفتاح الألوان
+        st.markdown('<div class="legend-box"><b>🗺️ مفتاح الألوان:</b>', unsafe_allow_html=True)
+        for status, color in status_colors.items():
+            st.markdown(f'<span style="color:{color}">⬤</span> {status}', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.warning("لا توجد بيانات صالحة في هذه الطبقة.")
+
+# التبويبات
+tabs = {
     "DATA GATHERING": "DATA GATHERING.json",
     "HCNREPAIR": "HCNREPAIR.json",
     "LEAK": "LEAK.json",
@@ -16,51 +102,8 @@ layer_files = {
     "VALVES": "VALVES.json"
 }
 
-status_colors = {
-    "DONE": "limegreen",
-    "IN PROGRESS": "yellow",
-    "PLANNED": "pink",
-    "PENDING": "dodgerblue",
-}
+selected_tab = st.sidebar.radio("اختر البند:", list(tabs.keys()))
+gdf = load_data(tabs[selected_tab])
+plot_map(gdf, selected_tab)
 
-selected_layer = st.selectbox("اختر البند:", list(layer_files.keys()), index=0)
-
-file_path = layer_files[selected_layer]
-
-try:
-    with open(file_path, encoding="utf-8") as f:
-        gj = json.load(f)
-    gdf = pd.json_normalize(gj["features"])
-    gdf["geometry"] = gdf["geometry"]
-    gdf["status"] = gdf["properties.PROG"].fillna("No Status")
-    gdf["name_en"] = gdf["properties.name_en"].fillna("Unknown")
-
-    gdf["color"] = gdf["status"].map(status_colors).fillna("lightblue")
-    gdf["id"] = gdf.index.astype(str)
-    gj["features"] = [f for i, f in enumerate(gj["features"]) if f.get("geometry")]
-    for i, f in enumerate(gj["features"]):
-        f["id"] = str(i)
-
-    fig = px.choropleth_mapbox(
-        gdf,
-        geojson=gj,
-        locations="id",
-        color="color",
-        color_discrete_map="identity",
-        mapbox_style="satellite-streets",
-        center={"lat": 26.4207, "lon": 50.0888},
-        zoom=10.3,
-        opacity=0.8,
-        hover_name="name_en",
-        hover_data=["status"]
-    )
-    fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, height=650)
-
-    st.plotly_chart(fig, use_container_width=True)
-
-    with st.expander("🧭 مفتاح الألوان:"):
-        for status, color in status_colors.items():
-            st.markdown(f"<span style='color:{color};font-weight:bold'>⬤ {status}</span>", unsafe_allow_html=True)
-        st.markdown(f"<span style='color:lightblue;font-weight:bold'>⬤ No Status</span>", unsafe_allow_html=True)
-except Exception as e:
-    st.error(f"حدث خطأ أثناء تحميل الطبقة: {e}")
+st.markdown('</div>', unsafe_allow_html=True)
