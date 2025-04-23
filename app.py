@@ -1,14 +1,12 @@
 
 import streamlit as st
 import pandas as pd
-import geopandas as gpd
 import plotly.express as px
 import json
-from streamlit_option_menu import option_menu
+import os
 
-st.set_page_config(layout="wide", page_title="Dammam Dashboard")
-
-st.markdown("<h1 style='text-align: center; color: #3399ff;'>GIZA ARABIA</h1>", unsafe_allow_html=True)
+st.set_page_config(layout="wide")
+st.markdown("<h1 style='text-align: center; color: #3498db;'>GIZA ARABIA</h1>", unsafe_allow_html=True)
 
 layer_files = {
     "DATA GATHERING": "DATA GATHERING.json",
@@ -22,58 +20,47 @@ status_colors = {
     "DONE": "limegreen",
     "IN PROGRESS": "yellow",
     "PLANNED": "pink",
-    "Pending": "dodgerblue",
-    None: "lightblue",
-    "": "lightblue",
-    "NO STATUS": "lightblue"
+    "PENDING": "dodgerblue",
 }
 
-selected_layer = option_menu(
-    menu_title="اختر البند:",
-    options=list(layer_files.keys()),
-    orientation="vertical"
-)
+selected_layer = st.selectbox("اختر البند:", list(layer_files.keys()), index=0)
 
-if selected_layer:
-    file_path = layer_files[selected_layer]
-    if file_path.endswith(".geojson"):
-        gdf = gpd.read_file(file_path)
-    else:
-        with open(file_path, encoding='utf-8') as f:
-            gj = json.load(f)
-        gdf = gpd.GeoDataFrame.from_features(gj["features"])
+file_path = layer_files[selected_layer]
 
-    status_col = None
-    for col in gdf.columns:
-        if col.upper() in ["PROG", "STATUS", "STAT", "PROGRESS"]:
-            status_col = col
-            break
+try:
+    with open(file_path, encoding="utf-8") as f:
+        gj = json.load(f)
+    gdf = pd.json_normalize(gj["features"])
+    gdf["geometry"] = gdf["geometry"]
+    gdf["status"] = gdf["properties.PROG"].fillna("No Status")
+    gdf["name_en"] = gdf["properties.name_en"].fillna("Unknown")
 
-    if status_col:
-        gdf["status_label"] = gdf[status_col].fillna("NO STATUS").astype(str)
-    else:
-        gdf["status_label"] = "NO STATUS"
-
-    gdf["color"] = gdf["status_label"].map(status_colors).fillna("lightblue")
+    gdf["color"] = gdf["status"].map(status_colors).fillna("lightblue")
+    gdf["id"] = gdf.index.astype(str)
+    gj["features"] = [f for i, f in enumerate(gj["features"]) if f.get("geometry")]
+    for i, f in enumerate(gj["features"]):
+        f["id"] = str(i)
 
     fig = px.choropleth_mapbox(
-        geojson=gdf.geometry.__geo_interface__,
-        locations=gdf.index,
-        color=gdf["status_label"],
-        mapbox_style="satellite",
-        center={"lat": 26.43, "lon": 50.1},
-        zoom=10,
-        opacity=0.5,
-        color_discrete_map=status_colors,
-        hover_name=gdf.get("name_en", gdf.index),
-        hover_data={"status_label": True}
+        gdf,
+        geojson=gj,
+        locations="id",
+        color="color",
+        color_discrete_map="identity",
+        mapbox_style="satellite-streets",
+        center={"lat": 26.4207, "lon": 50.0888},
+        zoom=10.3,
+        opacity=0.8,
+        hover_name="name_en",
+        hover_data=["status"]
     )
-
-    fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, height=700)
+    fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, height=650)
 
     st.plotly_chart(fig, use_container_width=True)
 
     with st.expander("🧭 مفتاح الألوان:"):
-        for label, color in status_colors.items():
-            if label:
-                st.markdown(f"<span style='color:{color}'>●</span> {label}", unsafe_allow_html=True)
+        for status, color in status_colors.items():
+            st.markdown(f"<span style='color:{color};font-weight:bold'>⬤ {status}</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='color:lightblue;font-weight:bold'>⬤ No Status</span>", unsafe_allow_html=True)
+except Exception as e:
+    st.error(f"حدث خطأ أثناء تحميل الطبقة: {e}")
