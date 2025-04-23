@@ -1,3 +1,4 @@
+
 import streamlit as st
 import geopandas as gpd
 import plotly.express as px
@@ -7,9 +8,10 @@ st.title("Dammam Dashboard")
 
 # تعريف ألوان الحالات
 status_colors = {
-    "done": "green",
-    "IN progress": "yellow",
-    "pending": "blue",
+    "done": "limegreen",
+    "in progress": "yellow",
+    "planned": "pink",
+    "pending": "dodgerblue",
     "": "lightblue",
     None: "lightblue"
 }
@@ -26,7 +28,8 @@ def load_data(file_path):
 # رسم الخريطة
 def plot_map(gdf, layer_name):
     if gdf is not None and "PROG" in gdf.columns:
-        gdf["color"] = gdf["PROG"].map(status_colors).fillna("lightblue")
+        gdf["prog_clean"] = gdf["PROG"].astype(str).str.lower().str.strip()
+        gdf["color"] = gdf["prog_clean"].map(status_colors).fillna("lightblue")
         fig = px.choropleth_mapbox(
             gdf,
             geojson=gdf.geometry,
