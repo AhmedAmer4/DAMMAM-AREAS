@@ -2,3 +2,5 @@ streamlit
 geopandas
 pandas
 plotly
+streamlit-option-menu
+streamlit-folium
