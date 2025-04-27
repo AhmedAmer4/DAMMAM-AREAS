@@ -1,1 +1,31 @@
-Deleted DATA GATHERING.json
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 1,
+        "district_i": 0,
+        "city_id": 0,
+        "region_id": 0,
+        "name_ar": "حي النور",
+        "name_en": "Al Noor Dist.",
+        "PROG": "IN PROGRESS",
+        "Shape_Length": 0.259,
+        "Shape_Area": 0.0015
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [50.181253559604158, 26.481536111002754],
+            [50.182253559604158, 26.481536111002754],
+            [50.182253559604158, 26.482536111002754],
+            [50.181253559604158, 26.482536111002754],
+            [50.181253559604158, 26.481536111002754]
+          ]
+        ]
+      }
+    }
+  ]
+}
