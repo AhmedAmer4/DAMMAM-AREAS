@@ -1,31 +1,111 @@
-{
-  "type": "FeatureCollection",
-  "features": [
-    {
-      "type": "Feature",
-      "properties": {
-        "OBJECTID": 1,
-        "district_i": 0,
-        "city_id": 0,
-        "region_id": 0,
-        "name_ar": "حي النور",
-        "name_en": "Al Noor Dist.",
-        "PROG": "IN PROGRESS",
-        "Shape_Length": 0.259,
-        "Shape_Area": 0.0015
-      },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [
-          [
-            [50.181253559604158, 26.481536111002754],
-            [50.182253559604158, 26.481536111002754],
-            [50.182253559604158, 26.482536111002754],
-            [50.181253559604158, 26.482536111002754],
-            [50.181253559604158, 26.481536111002754]
-          ]
-        ]
-      }
+import streamlit as st
+import geopandas as gpd
+import plotly.express as px
+import pandas as pd
+
+st.set_page_config(page_title="Dammam Dashboard", layout="wide")
+
+# CSS لتنسيق العنوان والخلفية
+st.markdown(
+    """
+    <style>
+    .main {
+        background-color: #0d1b2a;
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
     }
-  ]
+    .title {
+        font-size: 36px;
+        font-weight: bold;
+        color: #2196f3;
+        text-align: center;
+        margin-bottom: 5px;
+    }
+    .subtitle {
+        font-size: 24px;
+        font-weight: bold;
+        color: white;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .legend-box {
+        background-color: #1e293b;
+        padding: 10px;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# العنوان الرئيسي
+st.markdown('<div class="title">GIZA ARABIA</div>', unsafe_allow_html=True)
+# العنوان الفرعي
+st.markdown('<div class="subtitle">WORK PROGRESS</div>', unsafe_allow_html=True)
+
+st.markdown('<div class="main">', unsafe_allow_html=True)
+
+# تعريف الألوان الموحدة لكل الحالات
+status_colors = {
+    "DONE": "limegreen",
+    "IN PROGRESS": "yellow",
+    "PLANNED": "pink",
+    "PENDING": "dodgerblue",
+    "NO STATUS": "lightblue"
 }
+
+# تحميل البيانات
+@st.cache_data
+def load_data(file_path):
+    try:
+        gdf = gpd.read_file(file_path)
+        return gdf
+    except Exception as e:
+        st.error(f"Error loading file: {e}")
+        return None
+
+# رسم الخريطة
+def plot_map(gdf):
+    if gdf is not None and "PROG" in gdf.columns and "name_en" in gdf.columns:
+        gdf["status_label"] = gdf["PROG"].fillna("").astype(str).str.strip().str.upper()
+
+        # تطبيع وتعديل أسماء الحالات
+        gdf["status_label"] = gdf["status_label"].replace({
+            "": "NO STATUS",
+            "DONE": "DONE",
+            "IN PROGRESS": "IN PROGRESS",
+            "PLANNED": "PLANNED",
+            "PENDING": "PENDING"
+        })
+        gdf["status_label"] = gdf["status_label"].where(gdf["status_label"].isin(status_colors.keys()), "NO STATUS")
+        gdf["hover_text"] = "Area: " + gdf["name_en"] + "<br>Status: " + gdf["status_label"]
+
+        fig = px.choropleth_mapbox(
+            gdf,
+            geojson=gdf.geometry,
+            locations=gdf.index,
+            color="status_label",
+            hover_name="hover_text",
+            center={"lat": 26.43, "lon": 50.10},
+            mapbox_style="carto-positron",  # خريطة light رمادية
+            zoom=10,
+            color_discrete_map=status_colors
+        )
+        fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+        st.plotly_chart(fig, use_container_width=True)
+
+        # مفتاح الألوان
+        st.markdown('<div class="legend-box"><b>\ud83d\uddd0\ufe0f مفتاح الألوان:</b>', unsafe_allow_html=True)
+        for status, color in status_colors.items():
+            st.markdown(f'<span style="color:{color}">\u2b24</span> {status}', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.warning("لا توجد بيانات صالحة في هذه الطبقة.")
+
+# تحميل وعرض البيانات
+gdf = load_data("DATA GATHERING.json")
+plot_map(gdf)
+
+st.markdown('</div>', unsafe_allow_html=True)
